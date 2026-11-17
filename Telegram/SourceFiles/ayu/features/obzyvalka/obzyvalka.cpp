@@ -65,6 +65,7 @@ void Obzyvalka::handleNewItem(not_null<HistoryItem*> item) {
 		|| item->out()
 		|| item->isService()
 		|| item->isScheduled()
+		|| !item->unread(item->notificationThread())
 		|| item->isEmpty()
 		|| item->originalText().text.trimmed().isEmpty()
 		|| item->date() < base::unixtime::now() - 60) {
