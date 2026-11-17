@@ -15,6 +15,7 @@
 #include "boxes/peer_list_box.h"
 #include "core/application.h"
 #include "data/data_user.h"
+#include "data/data_thread.h"
 #include "inline_bots/bot_attach_web_view.h"
 #include "window/window_peer_menu.h"
 #include "main/main_account.h"
@@ -40,6 +41,9 @@
 #include "ui/widgets/menu/menu_item_base.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
+
+#include <QInputDialog>
+#include <QLineEdit>
 
 namespace Settings {
 
@@ -742,8 +746,41 @@ void BuildObzyvalka(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 	builder.addButton({
 		.id = u"ayu/obzyvalkaEndpointInfo"_q,
-		.title = rpl::single(QString::fromUtf8("Ollama: http://127.0.0.1:11434")),
+		.title = rpl::single(QString::fromUtf8("Адрес Ollama: %1").arg(
+			AyuSettings::getInstance().obzyvalkaEndpoint())),
 		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			auto ok = false;
+			const auto value = QInputDialog::getText(
+				nullptr,
+				QString::fromUtf8("Адрес Ollama"),
+				QString::fromUtf8("Например: http://127.0.0.1:11434"),
+				QLineEdit::Normal,
+				AyuSettings::getInstance().obzyvalkaEndpoint(),
+				&ok);
+			if (ok) {
+				AyuSettings::getInstance().setObzyvalkaEndpoint(value);
+			}
+		},
+	});
+	builder.addButton({
+		.id = u"ayu/obzyvalkaModel"_q,
+		.title = rpl::single(QString::fromUtf8("Модель Qwen: %1").arg(
+			AyuSettings::getInstance().obzyvalkaModel())),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			auto ok = false;
+			const auto value = QInputDialog::getText(
+				nullptr,
+				QString::fromUtf8("Модель Ollama"),
+				QString::fromUtf8("Например: qwen3-4b-local"),
+				QLineEdit::Normal,
+				AyuSettings::getInstance().obzyvalkaModel(),
+				&ok);
+			if (ok) {
+				AyuSettings::getInstance().setObzyvalkaModel(value);
+			}
+		},
 	});
 	builder.addSkip();
 }
