@@ -727,7 +727,7 @@ void BuildObzyvalka(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 				controller,
 				[=](not_null<Data::Thread*> thread) {
 					const auto peer = thread->peer();
-					if (!peer->isUser()) {
+					if (!peer->isUser() || peer->asUser()->isBot()) {
 						return false;
 					}
 					AyuSettings::getInstance().setObzyvalkaUserId(
