@@ -1,0 +1,135 @@
+name: Build Obzyvalka (Windows x64)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: obzyvalka-windows-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build AyuGram with Obzyvalka
+    runs-on: windows-latest
+    timeout-minutes: 350
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      TBUILD: ${{ github.workspace }}\TBuild
+      SRC: ${{ github.workspace }}\TBuild\AyuGramDesktop
+      TDESKTOP_API_ID: ${{ vars.TDESKTOP_API_ID }}
+      TDESKTOP_API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+
+    steps:
+      - name: Check Telegram API credentials
+        run: |
+          if ($env:TDESKTOP_API_ID -notmatch '^[1-9][0-9]*$') {
+            throw 'Add repository variable TDESKTOP_API_ID in Settings > Secrets and variables > Actions.'
+          }
+          if ($env:TDESKTOP_API_HASH -notmatch '^[0-9a-fA-F]{32}$') {
+            throw 'Add repository secret TDESKTOP_API_HASH in Settings > Secrets and variables > Actions.'
+          }
+
+      - name: Checkout source and submodules
+        uses: actions/checkout@v7
+        with:
+          ref: feature/obzyvalka
+          submodules: recursive
+          path: TBuild/AyuGramDesktop
+          persist-credentials: false
+
+      - name: Read Windows SDK version
+        id: toolchain
+        shell: bash
+        run: |
+          sdk=$(sed -n 's/.*\*\*\([^*]*\)\*\* SDK version.*/\1/p' "$SRC/docs/building-win.md" | head -1)
+          test -n "$sdk"
+          echo "sdk=$sdk" >> "$GITHUB_OUTPUT"
+
+      - name: Install Visual Studio ATL component
+        run: |
+          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
+          $vswhere = Join-Path $installer 'vswhere.exe'
+          $setup = Join-Path $installer 'setup.exe'
+          $toolsComponent = 'Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64'
+          $atlComponent = 'Microsoft.VisualStudio.Component.VC.14.44.17.14.ATL'
+          $path = @(& $vswhere -latest -products '*' -requires $toolsComponent -property installationPath)[0]
+          if (-not $path) { throw "No Visual Studio instance provides $toolsComponent." }
+          $toolset = Get-ChildItem (Join-Path $path 'VC\Tools\MSVC') -Directory |
+            Where-Object { $_.Name -like '14.44.*' } |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+          $header = Join-Path $toolset.FullName 'atlmfc\include\atlbase.h'
+          if (-not (Test-Path $header)) {
+            $process = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
+              'modify', '--installPath', "`"$path`"", '--add', $atlComponent,
+              '--quiet', '--norestart', '--nocache')
+            if ($process.ExitCode -notin @(0, 3010)) { exit $process.ExitCode }
+          }
+          if (-not (Test-Path $header)) { throw "ATL was not installed at $header." }
+
+      - name: Initialize MSVC x64 toolchain
+        uses: Eden-CI/msvc-dev-cmd@1bd71f95d6f3d1b2b3395b335cc63bcdc90cf223
+        with:
+          arch: x64
+          sdk: ${{ steps.toolchain.outputs.sdk }}
+          toolset: '14.44'
+
+      - name: Prepare third-party libraries
+        shell: cmd
+        run: call %SRC%\Telegram\build\prepare\win.bat silent qt-release-only
+
+      - name: Configure Release build
+        shell: cmd
+        run: |
+          cd /d %SRC%\Telegram
+          call configure.bat -G "Ninja Multi-Config" ^
+            -D CMAKE_CONFIGURATION_TYPES=Release ^
+            -D CMAKE_EXPORT_COMPILE_COMMANDS=ON ^
+            -D "TDESKTOP_API_ID=%TDESKTOP_API_ID%" ^
+            -D "TDESKTOP_API_HASH=%TDESKTOP_API_HASH%" ^
+            -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+            -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+          if errorlevel 1 exit /b %errorlevel%
+
+      - name: Build AyuGram
+        shell: cmd
+        run: cmake --build %SRC%\out --config Release --parallel --target Telegram
+
+      - name: Package portable Windows build
+        run: |
+          $out = Join-Path $env:SRC 'out\Release'
+          $binary = Join-Path $out 'AyuGram.exe'
+          if (-not (Test-Path $binary)) { throw 'AyuGram.exe was not produced.' }
+
+          $d3d = Join-Path $out 'modules\x64\d3d\d3dcompiler_47.dll'
+          if (-not (Test-Path $d3d)) { throw 'D3D compiler module is missing.' }
+
+          $portable = Join-Path $env:RUNNER_TEMP 'AyuGram'
+          New-Item -ItemType Directory -Force (Join-Path $portable 'TelegramForcePortable') | Out-Null
+          New-Item -ItemType Directory -Force (Join-Path $portable 'modules\x64\d3d') | Out-Null
+          Copy-Item $binary (Join-Path $portable 'AyuGram.exe')
+          Copy-Item $d3d (Join-Path $portable 'modules\x64\d3d\d3dcompiler_47.dll')
+
+          $artifacts = Join-Path $env:SRC 'artifacts'
+          New-Item -ItemType Directory -Force $artifacts | Out-Null
+          Copy-Item $binary (Join-Path $artifacts 'AyuGram.exe')
+          & 7z a -mx5 (Join-Path $artifacts 'AyuGram-portable.zip') $portable
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & 7z t (Join-Path $artifacts 'AyuGram-portable.zip')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v7
+        with:
+          name: AyuGram-Obzyvalka-Windows-x64
+          path: |
+            ${{ env.SRC }}\artifacts\AyuGram.exe
+            ${{ env.SRC }}\artifacts\AyuGram-portable.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
