@@ -24,19 +24,8 @@ jobs:
     env:
       TBUILD: ${{ github.workspace }}\TBuild
       SRC: ${{ github.workspace }}\TBuild\AyuGramDesktop
-      TDESKTOP_API_ID: ${{ vars.TDESKTOP_API_ID }}
-      TDESKTOP_API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
 
     steps:
-      - name: Check Telegram API credentials
-        run: |
-          if ($env:TDESKTOP_API_ID -notmatch '^[1-9][0-9]*$') {
-            throw 'Add repository variable TDESKTOP_API_ID in Settings > Secrets and variables > Actions.'
-          }
-          if ($env:TDESKTOP_API_HASH -notmatch '^[0-9a-fA-F]{32}$') {
-            throw 'Add repository secret TDESKTOP_API_HASH in Settings > Secrets and variables > Actions.'
-          }
-
       - name: Checkout source and submodules
         uses: actions/checkout@v7
         with:
@@ -93,8 +82,7 @@ jobs:
           call configure.bat -G "Ninja Multi-Config" ^
             -D CMAKE_CONFIGURATION_TYPES=Release ^
             -D CMAKE_EXPORT_COMPILE_COMMANDS=ON ^
-            -D "TDESKTOP_API_ID=%TDESKTOP_API_ID%" ^
-            -D "TDESKTOP_API_HASH=%TDESKTOP_API_HASH%" ^
+            -D TDESKTOP_API_TEST=ON ^
             -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
             -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
           if errorlevel 1 exit /b %errorlevel%
