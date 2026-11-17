@@ -47,6 +47,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/ui_integration.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
+#include "ayu/features/obzyvalka/obzyvalka.h"
 #include "spellcheck/spellcheck_highlight_syntax.h"
 #include "chat_helpers/stickers_emoji_pack.h"
 #include "payments/payments_reaction_process.h" // TryAddingPaidReaction.
@@ -2373,6 +2374,11 @@ void Element::validateText() {
 		if (!_text.isEmpty()) {
 			setTextWithLinks({});
 		}
+		clearRichPage();
+		return;
+	}
+	if (const auto replacement = history()->session().obzyvalka().displayText(item->fullId())) {
+		setTextWithLinks({ .text = *replacement });
 		clearRichPage();
 		return;
 	}
