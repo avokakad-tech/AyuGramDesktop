@@ -89,6 +89,10 @@ namespace Wallet {
 class Session;
 } // namespace Wallet
 
+namespace Ayu {
+class Obzyvalka;
+} // namespace Ayu
+
 namespace Main {
 
 class Account;
@@ -271,6 +275,10 @@ public:
 		return *_api;
 	}
 
+	[[nodiscard]] Ayu::Obzyvalka &obzyvalka() const {
+		return *_obzyvalka;
+	}
+
 	// Terms lock.
 	void lockByTerms(const Window::TermsLock &data);
 	void unlockTerms();
@@ -332,6 +340,7 @@ private:
 
 	// _data depends on _downloader / _uploader.
 	const std::unique_ptr<Data::Session> _data;
+	const std::unique_ptr<Ayu::Obzyvalka> _obzyvalka;
 	const not_null<UserData*> _user;
 
 	// _emojiStickersPack depends on _data.
