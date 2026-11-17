@@ -50,13 +50,18 @@ Obzyvalka::Obzyvalka(not_null<Main::Session*> session)
 
 std::optional<QString> Obzyvalka::displayText(FullMsgId id) const {
 	const auto &settings = AyuSettings::getInstance();
-	if (!settings.obzyvalkaEnabled() || settings.obzyvalkaMode() != 1) {
+	if (!settings.obzyvalkaEnabled()
+		|| settings.obzyvalkaMode() != 1
+		|| !settings.obzyvalkaChatId()
+		|| !settings.obzyvalkaUserId()
+		|| id.peer.value != static_cast<uint64>(settings.obzyvalkaChatId())) {
 		return std::nullopt;
 	}
 	const auto i = _displayText.find(id);
-	return (i == end(_displayText))
+	return (i == end(_displayText)
+		|| i->second.senderId != settings.obzyvalkaUserId())
 		? std::nullopt
-		: std::optional<QString>(i->second);
+		: std::optional<QString>(i->second.text);
 }
 
 void Obzyvalka::handleNewItem(not_null<HistoryItem*> item) {
@@ -205,7 +210,10 @@ void Obzyvalka::requestRewrite(
 		}
 
 		if (AyuSettings::getInstance().obzyvalkaMode() == 1) {
-			_displayText[id] = rewritten;
+			_displayText[id] = {
+				.text = rewritten,
+				.senderId = currentItem->from()->id.value,
+			};
 			if (_displayText.size() > 512) {
 				_displayText.erase(_displayText.begin());
 			}
