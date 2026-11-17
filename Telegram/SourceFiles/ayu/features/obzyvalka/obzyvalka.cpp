@@ -199,7 +199,8 @@ void Obzyvalka::requestRewrite(
 		const auto rewritten = result.value("text").toString().trimmed();
 		if (rewritten.isEmpty()
 			|| rewritten.size() > 3000
-			|| rewritten == text.trimmed()) {
+			|| rewritten == text.trimmed()
+			|| currentItem->originalText().text != text) {
 			return;
 		}
 
