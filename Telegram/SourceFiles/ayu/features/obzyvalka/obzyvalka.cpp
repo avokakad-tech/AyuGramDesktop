@@ -88,6 +88,9 @@ void Obzyvalka::handleNewItem(not_null<HistoryItem*> item) {
 		_processed.erase(_processed.begin());
 	}
 
+	if (_pendingItems.size() >= 4) {
+		return;
+	}
 	_pendingItems.emplace(id, item);
 	requestRewrite(item, item->originalText().text);
 }
@@ -117,6 +120,7 @@ void Obzyvalka::requestRewrite(
 		"{\"is_insult\":false,\"text\":\"\"}. "
 		"Если оскорбление есть, перепиши только исходную фразу так, чтобы автор говорил "
 		"о себе вместо обращения к собеседнику. Сохрани смысл, стиль, русский язык и пунктуацию. "
+		"Пример: \"Привет, ты полный дурак.\" -> \"Привет, я полный дурак.\". "
 		"Не усиливай оскорбление, не добавляй новых оскорблений и не отвечай на сообщение. "
 		"Верни строго JSON без Markdown: "
 		"{\"is_insult\":true,\"text\":\"переписанная фраза\"}.");
@@ -128,7 +132,7 @@ void Obzyvalka::requestRewrite(
 	});
 	messages.push_back(QJsonObject{
 		{ "role", "user" },
-		{ "content", QString("<incoming_message>\\n%1\\n</incoming_message>").arg(text.left(2500)) },
+		{ "content", QString("<incoming_message>\n%1\n</incoming_message>").arg(text.left(2500)) },
 	});
 	const auto body = QJsonObject{
 		{ "model", settings.obzyvalkaModel() },
