@@ -15,6 +15,8 @@
 #include "boxes/peer_list_box.h"
 #include "core/application.h"
 #include "data/data_user.h"
+#include "inline_bots/bot_attach_web_view.h"
+#include "window/window_peer_menu.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
@@ -685,6 +687,53 @@ void BuildObzyvalka(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 			AyuSettings::getInstance().setObzyvalkaMode(value);
 		},
 		.keywords = { u"режим"_q, u"ответ"_q, u"подмена"_q },
+	});
+	const auto controller = builder.controller();
+	builder.addButton({
+		.id = u"ayu/obzyvalkaChat"_q,
+		.title = rpl::single(QString::fromUtf8("Выбрать чат (ID: %1)").arg(
+			AyuSettings::getInstance().obzyvalkaChatId())),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			auto types = InlineBots::PeerTypes();
+			types |= InlineBots::PeerType::User;
+			types |= InlineBots::PeerType::Group;
+			types |= InlineBots::PeerType::Broadcast;
+			Window::ShowChooseRecipientBox(
+				controller,
+				[=](not_null<Data::Thread*> thread) {
+					AyuSettings::getInstance().setObzyvalkaChatId(
+						static_cast<int64>(thread->peer()->id.value));
+					return true;
+				},
+				rpl::single(QString::fromUtf8("Выбери чат для Обзывалки")),
+				nullptr,
+				types);
+		},
+	});
+	builder.addButton({
+		.id = u"ayu/obzyvalkaUser"_q,
+		.title = rpl::single(QString::fromUtf8("Выбрать пользователя (ID: %1)").arg(
+			AyuSettings::getInstance().obzyvalkaUserId())),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			auto types = InlineBots::PeerTypes();
+			types |= InlineBots::PeerType::User;
+			Window::ShowChooseRecipientBox(
+				controller,
+				[=](not_null<Data::Thread*> thread) {
+					const auto peer = thread->peer();
+					if (!peer->isUser()) {
+						return false;
+					}
+					AyuSettings::getInstance().setObzyvalkaUserId(
+						peer->id.value);
+					return true;
+				},
+				rpl::single(QString::fromUtf8("Выбери пользователя")),
+				nullptr,
+				types);
+		},
 	});
 	builder.addButton({
 		.id = u"ayu/obzyvalkaInfo"_q,
