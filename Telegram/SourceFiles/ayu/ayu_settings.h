@@ -353,6 +353,12 @@ public:
 	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
+	[[nodiscard]] bool obzyvalkaEnabled() const { return _obzyvalkaEnabled.current(); }
+	[[nodiscard]] int obzyvalkaMode() const { return _obzyvalkaMode.current(); }
+	[[nodiscard]] int64 obzyvalkaChatId() const { return _obzyvalkaChatId.current(); }
+	[[nodiscard]] uint64 obzyvalkaUserId() const { return _obzyvalkaUserId.current(); }
+	[[nodiscard]] const QString &obzyvalkaEndpoint() const { return _obzyvalkaEndpoint.current(); }
+	[[nodiscard]] const QString &obzyvalkaModel() const { return _obzyvalkaModel.current(); }
 
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
@@ -440,6 +446,12 @@ public:
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
 	void setStreamerMode(bool val);
+	void setObzyvalkaEnabled(bool val);
+	void setObzyvalkaMode(int val);
+	void setObzyvalkaChatId(int64 val);
+	void setObzyvalkaUserId(uint64 val);
+	void setObzyvalkaEndpoint(const QString &val);
+	void setObzyvalkaModel(const QString &val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeChanges() const { return _useGlobalGhostMode.changes(); }
@@ -711,6 +723,12 @@ private:
 	rpl::variable<int> _avatarCorners = 23;
 	rpl::variable<bool> _singleCornerRadius = false;
 	rpl::variable<bool> _streamerMode = false;
+	rpl::variable<bool> _obzyvalkaEnabled = false;
+	rpl::variable<int> _obzyvalkaMode = 0; // 0 = automatic reply, 1 = local display replacement.
+	rpl::variable<int64> _obzyvalkaChatId = 0;
+	rpl::variable<uint64> _obzyvalkaUserId = 0;
+	rpl::variable<QString> _obzyvalkaEndpoint = QString("http://127.0.0.1:11434");
+	rpl::variable<QString> _obzyvalkaModel = QString("qwen3-4b-local");
 
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;
