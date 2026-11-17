@@ -16,6 +16,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrl>
+#include "base/unixtime.h"
 
 namespace Ayu {
 namespace {
@@ -61,7 +62,8 @@ void Obzyvalka::handleNewItem(not_null<HistoryItem*> item) {
 		|| item->isService()
 		|| item->isScheduled()
 		|| item->isEmpty()
-		|| item->originalText().text.trimmed().isEmpty()) {
+		|| item->originalText().text.trimmed().isEmpty()
+		|| item->date() < base::unixtime::now() - 60) {
 		return;
 	}
 
