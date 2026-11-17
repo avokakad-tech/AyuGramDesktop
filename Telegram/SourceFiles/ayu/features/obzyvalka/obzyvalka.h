@@ -2,6 +2,9 @@
 #pragma once
 
 #include "data/data_msg_id.h"
+#include "rpl/lifetime.h"
+
+#include <optional>
 
 #include <QObject>
 #include <QNetworkAccessManager>
