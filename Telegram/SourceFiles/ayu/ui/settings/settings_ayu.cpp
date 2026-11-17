@@ -661,6 +661,44 @@ void BuildSpyEssentials(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 }
 
+void BuildObzyvalka(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+	builder.addSubsectionTitle(rpl::single(QString::fromUtf8("Обзывалка")));
+
+	ayu.addSettingToggle({
+		.id = u"ayu/obzyvalkaEnabled"_q,
+		.title = rpl::single(QString::fromUtf8("Включить Обзывалку")),
+		.getter = &AyuSettings::obzyvalkaEnabled,
+		.setter = &AyuSettings::setObzyvalkaEnabled,
+		.keywords = { u"qwen"_q, u"ollama"_q, u"ai"_q },
+	});
+
+	ayu.addChooseButton({
+		.id = u"ayu/obzyvalkaMode"_q,
+		.title = rpl::single(QString::fromUtf8("Режим работы")),
+		.boxTitle = rpl::single(QString::fromUtf8("Режим работы Обзывалки")),
+		.initialSelection = AyuSettings::getInstance().obzyvalkaMode(),
+		.options = {
+			QString::fromUtf8("А — Автоматический ответ"),
+			QString::fromUtf8("Б — Локальная подмена"),
+		},
+		.setter = [](int value) {
+			AyuSettings::getInstance().setObzyvalkaMode(value);
+		},
+		.keywords = { u"режим"_q, u"ответ"_q, u"подмена"_q },
+	});
+	builder.addButton({
+		.id = u"ayu/obzyvalkaInfo"_q,
+		.title = rpl::single(QString::fromUtf8("Модель: qwen3-4b-local")),
+		.st = &st::settingsButtonNoIcon,
+	});
+	builder.addButton({
+		.id = u"ayu/obzyvalkaEndpointInfo"_q,
+		.title = rpl::single(QString::fromUtf8("Ollama: http://127.0.0.1:11434")),
+		.st = &st::settingsButtonNoIcon,
+	});
+	builder.addSkip();
+}
+
 void BuildOther(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	builder.addSubsectionTitle(tr::ayu_MessageSavingOtherHeader());
 
@@ -692,6 +730,8 @@ const auto kMeta = BuildHelper({
 	builder.addSkip();
 	BuildSpyEssentials(builder, ayu);
 
+	ayu.addSectionDivider();
+	BuildObzyvalka(builder, ayu);
 	ayu.addSectionDivider();
 	BuildOther(builder, ayu);
 	builder.addSkip();
