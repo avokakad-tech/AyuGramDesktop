@@ -35,7 +35,11 @@ private:
 	QNetworkAccessManager _network;
 	std::set<FullMsgId> _processed;
 	std::map<FullMsgId, not_null<HistoryItem*>> _pendingItems;
-	std::map<FullMsgId, QString> _displayText;
+	struct DisplayOverride {
+		QString text;
+		uint64 senderId = 0;
+	};
+	std::map<FullMsgId, DisplayOverride> _displayText;
 	qint64 _lastAutomaticReplyMs = 0;
 	rpl::lifetime _lifetime;
 };
