@@ -2,6 +2,9 @@ name: Build Obzyvalka (Windows x64)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/obzyvalka
 
 permissions:
   contents: read
@@ -121,7 +124,7 @@ jobs:
           & 7z a -mx5 (Join-Path $artifacts 'AyuGram-portable.zip') $portable
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & 7z t (Join-Path $artifacts 'AyuGram-portable.zip')
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v7
