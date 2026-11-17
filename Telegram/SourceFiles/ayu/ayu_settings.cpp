@@ -1069,6 +1069,45 @@ void AyuSettings::setStreamerMode(bool val) {
 	save();
 }
 
+void AyuSettings::setObzyvalkaEnabled(bool val) {
+	if (_obzyvalkaEnabled.current() == val) return;
+	_obzyvalkaEnabled = val;
+	save();
+}
+
+void AyuSettings::setObzyvalkaMode(int val) {
+	val = std::clamp(val, 0, 1);
+	if (_obzyvalkaMode.current() == val) return;
+	_obzyvalkaMode = val;
+	save();
+}
+
+void AyuSettings::setObzyvalkaChatId(int64 val) {
+	if (_obzyvalkaChatId.current() == val) return;
+	_obzyvalkaChatId = val;
+	save();
+}
+
+void AyuSettings::setObzyvalkaUserId(uint64 val) {
+	if (_obzyvalkaUserId.current() == val) return;
+	_obzyvalkaUserId = val;
+	save();
+}
+
+void AyuSettings::setObzyvalkaEndpoint(const QString &val) {
+	const auto normalized = val.trimmed();
+	if (normalized.isEmpty() || _obzyvalkaEndpoint.current() == normalized) return;
+	_obzyvalkaEndpoint = normalized;
+	save();
+}
+
+void AyuSettings::setObzyvalkaModel(const QString &val) {
+	const auto normalized = val.trimmed();
+	if (normalized.isEmpty() || _obzyvalkaModel.current() == normalized) return;
+	_obzyvalkaModel = normalized;
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1165,6 +1204,12 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
 		{"streamerMode", s._streamerMode.current()},
+		{"obzyvalkaEnabled", s._obzyvalkaEnabled.current()},
+		{"obzyvalkaMode", s._obzyvalkaMode.current()},
+		{"obzyvalkaChatId", s._obzyvalkaChatId.current()},
+		{"obzyvalkaUserId", s._obzyvalkaUserId.current()},
+		{"obzyvalkaEndpoint", s._obzyvalkaEndpoint.current()},
+		{"obzyvalkaModel", s._obzyvalkaModel.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1269,6 +1314,12 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
+	s._obzyvalkaEnabled = j.value("obzyvalkaEnabled", defaults._obzyvalkaEnabled.current());
+	s._obzyvalkaMode = std::clamp(j.value("obzyvalkaMode", defaults._obzyvalkaMode.current()), 0, 1);
+	s._obzyvalkaChatId = j.value("obzyvalkaChatId", defaults._obzyvalkaChatId.current());
+	s._obzyvalkaUserId = j.value("obzyvalkaUserId", defaults._obzyvalkaUserId.current());
+	s._obzyvalkaEndpoint = j.value("obzyvalkaEndpoint", defaults._obzyvalkaEndpoint.current());
+	s._obzyvalkaModel = j.value("obzyvalkaModel", defaults._obzyvalkaModel.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);
