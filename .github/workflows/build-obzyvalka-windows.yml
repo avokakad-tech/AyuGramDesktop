@@ -108,14 +108,19 @@ jobs:
           CCACHE_DISABLE: '1'
         run: call %SRC%\\Telegram\\build\\prepare\\win.bat silent qt-release-only
 
-      - name: Save dependency caches
-        if: steps.third-party-cache.outputs.cache-hit != 'true' || steps.libraries-cache.outputs.cache-hit != 'true'
+      - name: Save ThirdParty cache
+        if: steps.third-party-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
-          path: |
-            ${{ env.TBUILD }}\\ThirdParty
-            ${{ env.TBUILD }}\\Libraries\\win64
-          key: windows-x64-obzyvalka-dependencies-${{ steps.toolchain.outputs.key }}
+          path: ${{ env.TBUILD }}\\ThirdParty
+          key: ${{ steps.third-party-cache.outputs.cache-primary-key }}
+
+      - name: Save libraries cache
+        if: steps.libraries-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.TBUILD }}\\Libraries\\win64
+          key: ${{ steps.libraries-cache.outputs.cache-primary-key }}
 
       - name: Add ZLIB library aliases for the application CMake
         run: |
