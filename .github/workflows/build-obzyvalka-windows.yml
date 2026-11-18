@@ -75,6 +75,22 @@ jobs:
         shell: cmd
         run: call %SRC%\Telegram\build\prepare\win.bat silent qt-release-only
 
+      - name: Add ZLIB library aliases for the application CMake
+        run: |
+          $zlib = Join-Path $env:TBUILD 'Libraries\win64\zlib'
+          $aliases = @(
+            @{ Source = 'Release\libzs.lib'; Target = 'Release\zlibstatic.lib' },
+            @{ Source = 'Debug\libzsd.lib'; Target = 'Debug\zlibstaticd.lib' }
+          )
+          foreach ($entry in $aliases) {
+            $source = Join-Path $zlib $entry.Source
+            $target = Join-Path $zlib $entry.Target
+            if (-not (Test-Path $source)) {
+              throw "Prepared ZLIB library is missing: $source"
+            }
+            Copy-Item -LiteralPath $source -Destination $target -Force
+          }
+
       - name: Configure Release build
         shell: cmd
         run: |
