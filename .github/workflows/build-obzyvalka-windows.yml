@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: obzyvalka-windows-build
@@ -22,8 +23,14 @@ jobs:
       run:
         shell: pwsh
     env:
-      TBUILD: ${{ github.workspace }}\TBuild
-      SRC: ${{ github.workspace }}\TBuild\AyuGramDesktop
+      GH_TOKEN: ${{ github.token }}
+      TBUILD: ${{ github.workspace }}\\TBuild
+      SRC: ${{ github.workspace }}\\TBuild\\AyuGramDesktop
+      CCACHE_DIR: ${{ github.workspace }}\\TBuild\\ccache
+      CCACHE_DEPEND: 'true'
+      CCACHE_MAXSIZE: 3G
+      CCACHE_COMPILERCHECK: content
+      CCACHE_SLOPPINESS: pch_defines,time_macros
 
     steps:
       - name: Checkout source and submodules
@@ -34,28 +41,30 @@ jobs:
           path: TBuild/AyuGramDesktop
           persist-credentials: false
 
-      - name: Read Windows SDK version
+      - name: Read Windows SDK version and cache key
         id: toolchain
         shell: bash
         run: |
-          sdk=$(sed -n 's/.*\*\*\([^*]*\)\*\* SDK version.*/\1/p' "$SRC/docs/building-win.md" | head -1)
+          sdk=$(sed -n 's/.*\\*\\*\\([^*]*\\)\\*\\* SDK version.*/\\1/p' "$SRC/docs/building-win.md" | head -1)
           test -n "$sdk"
+          key=$( { sha256sum "$SRC/Telegram/build/prepare/prepare.py"; printf '%s\\n%s\\n' "$sdk" "$TBUILD"; } | sha256sum | cut -d' ' -f1)
           echo "sdk=$sdk" >> "$GITHUB_OUTPUT"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
 
       - name: Install Visual Studio ATL component
         run: |
-          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
+          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\\Installer'
           $vswhere = Join-Path $installer 'vswhere.exe'
           $setup = Join-Path $installer 'setup.exe'
           $toolsComponent = 'Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64'
           $atlComponent = 'Microsoft.VisualStudio.Component.VC.14.44.17.14.ATL'
-          $path = @(& $vswhere -latest -products '*' -requires $toolsComponent -property installationPath)[0]
+          $path = @(&$vswhere -latest -products '*' -requires $toolsComponent -property installationPath)[0]
           if (-not $path) { throw "No Visual Studio instance provides $toolsComponent." }
-          $toolset = Get-ChildItem (Join-Path $path 'VC\Tools\MSVC') -Directory |
+          $toolset = Get-ChildItem (Join-Path $path 'VC\\Tools\\MSVC') -Directory |
             Where-Object { $_.Name -like '14.44.*' } |
             Sort-Object Name -Descending |
             Select-Object -First 1
-          $header = Join-Path $toolset.FullName 'atlmfc\include\atlbase.h'
+          $header = Join-Path $toolset.FullName 'atlmfc\\include\\atlbase.h'
           if (-not (Test-Path $header)) {
             $process = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
               'modify', '--installPath', "`"$path`"", '--add', $atlComponent,
@@ -71,16 +80,49 @@ jobs:
           sdk: ${{ steps.toolchain.outputs.sdk }}
           toolset: '14.44'
 
+      - name: Install compiler cache
+        run: |
+          choco install ccache --version=4.14.0 --no-progress -y
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ccache --version
+
+      - name: Restore ThirdParty cache
+        id: third-party-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.TBUILD }}\\ThirdParty
+          key: windows-x64-third-party-${{ steps.toolchain.outputs.key }}
+          restore-keys: windows-x64-third-party-
+
+      - name: Restore libraries cache
+        id: libraries-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.TBUILD }}\\Libraries\\win64
+          key: windows-x64-release-libraries-${{ steps.toolchain.outputs.key }}
+          restore-keys: windows-x64-release-libraries-
+
       - name: Prepare third-party libraries
         shell: cmd
-        run: call %SRC%\Telegram\build\prepare\win.bat silent qt-release-only
+        env:
+          CCACHE_DISABLE: '1'
+        run: call %SRC%\\Telegram\\build\\prepare\\win.bat silent qt-release-only
+
+      - name: Save dependency caches
+        if: steps.third-party-cache.outputs.cache-hit != 'true' || steps.libraries-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ${{ env.TBUILD }}\\ThirdParty
+            ${{ env.TBUILD }}\\Libraries\\win64
+          key: windows-x64-obzyvalka-dependencies-${{ steps.toolchain.outputs.key }}
 
       - name: Add ZLIB library aliases for the application CMake
         run: |
-          $zlib = Join-Path $env:TBUILD 'Libraries\win64\zlib'
+          $zlib = Join-Path $env:TBUILD 'Libraries\\win64\\zlib'
           $aliases = @(
-            @{ Source = 'Release\libzs.lib'; Target = 'Release\zlibstatic.lib' },
-            @{ Source = 'Debug\libzsd.lib'; Target = 'Debug\zlibstaticd.lib' }
+            @{ Source = 'Release\\libzs.lib'; Target = 'Release\\zlibstatic.lib' },
+            @{ Source = 'Debug\\libzsd.lib'; Target = 'Debug\\zlibstaticd.lib' }
           )
           foreach ($entry in $aliases) {
             $source = Join-Path $zlib $entry.Source
@@ -91,36 +133,69 @@ jobs:
             Copy-Item -LiteralPath $source -Destination $target -Force
           }
 
+      - name: Restore compiler cache
+        id: compiler-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.TBUILD }}\\ccache
+          key: ccache-windows-x64-obzyvalka-${{ github.sha }}
+          restore-keys: ccache-windows-x64-obzyvalka-
+
       - name: Configure Release build
         shell: cmd
         run: |
-          cd /d %SRC%\Telegram
+          ccache --zero-stats
+          cd /d %SRC%\\Telegram
           call configure.bat -G "Ninja Multi-Config" ^
             -D CMAKE_CONFIGURATION_TYPES=Release ^
             -D CMAKE_EXPORT_COMPILE_COMMANDS=ON ^
+            -D "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=" ^
+            -D CMAKE_C_COMPILER_LAUNCHER=ccache ^
+            -D CMAKE_CXX_COMPILER_LAUNCHER=ccache ^
             -D TDESKTOP_API_TEST=ON ^
             -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
             -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
           if errorlevel 1 exit /b %errorlevel%
 
+      - name: Verify low-memory Release configuration
+        run: |
+          $cache = @{}
+          Get-Content (Join-Path $env:SRC 'out\\CMakeCache.txt') | ForEach-Object {
+            if ($_ -match '^([^:#/][^:=]*):[^=]+=(.*)$') { $cache[$Matches[1]] = $Matches[2] }
+          }
+          if ($cache['CMAKE_CONFIGURATION_TYPES'] -ne 'Release') { throw 'Not a Release-only build.' }
+          if ($cache['CMAKE_C_COMPILER_LAUNCHER'] -ne 'ccache' -or $cache['CMAKE_CXX_COMPILER_LAUNCHER'] -ne 'ccache') {
+            throw 'Compiler cache is not wired into the build.'
+          }
+          if ($cache['CMAKE_MSVC_DEBUG_INFORMATION_FORMAT'] -ne '') { throw 'Release debug information was not disabled.' }
+          $commands = Get-Content (Join-Path $env:SRC 'out\\compile_commands.json') -Raw
+          if ($commands -match ' /Z(7|i) ') { throw 'Release objects unexpectedly include debug information.' }
+
       - name: Build AyuGram
         shell: cmd
-        run: cmake --build %SRC%\out --config Release --parallel --target Telegram
+        run: cmake --build %SRC%\\out --config Release --parallel --target Telegram
+
+      - name: Save compiler cache
+        if: ${{ always() && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.TBUILD }}\\ccache
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
 
       - name: Package portable Windows build
         run: |
-          $out = Join-Path $env:SRC 'out\Release'
+          $out = Join-Path $env:SRC 'out\\Release'
           $binary = Join-Path $out 'AyuGram.exe'
           if (-not (Test-Path $binary)) { throw 'AyuGram.exe was not produced.' }
 
-          $d3d = Join-Path $out 'modules\x64\d3d\d3dcompiler_47.dll'
+          $d3d = Join-Path $out 'modules\\x64\\d3d\\d3dcompiler_47.dll'
           if (-not (Test-Path $d3d)) { throw 'D3D compiler module is missing.' }
 
           $portable = Join-Path $env:RUNNER_TEMP 'AyuGram'
           New-Item -ItemType Directory -Force (Join-Path $portable 'TelegramForcePortable') | Out-Null
-          New-Item -ItemType Directory -Force (Join-Path $portable 'modules\x64\d3d') | Out-Null
+          New-Item -ItemType Directory -Force (Join-Path $portable 'modules\\x64\\d3d') | Out-Null
           Copy-Item $binary (Join-Path $portable 'AyuGram.exe')
-          Copy-Item $d3d (Join-Path $portable 'modules\x64\d3d\d3dcompiler_47.dll')
+          Copy-Item $d3d (Join-Path $portable 'modules\\x64\\d3d\\d3dcompiler_47.dll')
 
           $artifacts = Join-Path $env:SRC 'artifacts'
           New-Item -ItemType Directory -Force $artifacts | Out-Null
@@ -135,8 +210,8 @@ jobs:
         with:
           name: AyuGram-Obzyvalka-Windows-x64
           path: |
-            ${{ env.SRC }}\artifacts\AyuGram.exe
-            ${{ env.SRC }}\artifacts\AyuGram-portable.zip
+            ${{ env.SRC }}\\artifacts\\AyuGram.exe
+            ${{ env.SRC }}\\artifacts\\AyuGram-portable.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
